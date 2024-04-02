@@ -23,9 +23,41 @@ const char *regs[] = {
   "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6"
 };
 
+#define REGISTERS_PER_LINE 4
+#define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 void isa_reg_display() {
+  printf("isa_reg_display:\n");
+  for (int i = 0; i < ARRLEN(regs); i++) {
+    printf("%-4s: 0x%08x\n", regs[i], cpu.gpr[i]);
+  }
+
+
+  /* Another way to print registers */
+
+  // int length = ARRLEN(regs);
+  // int i = 0;
+  // printf("=========寄存器信息=========\n");
+  // for (i = 0; i < length; i+= REGISTERS_PER_LINE){
+  //   for (int j = i; j < MIN(length, i + REGISTERS_PER_LINE); ++j){
+  //     printf("\e[1;36m%3s:\e[0m %#12x | ", regs[j], cpu.gpr[j]);
+  //   }
+  //   printf("\n");
+  // }
+
 }
 
 word_t isa_reg_str2val(const char *s, bool *success) {
-  return 0;
+  *success = true;
+  if (strcmp(s, regs[0]) == 0){
+    return cpu.gpr[0];
+  }
+
+  for (int i = 1; i < ARRLEN(regs); i++) {
+    if (strcmp(regs[i], s+1) == 0) { // ignore the first character '$' 
+      *success = true;
+      return cpu.gpr[i];
+    }
+  }
+  *success = false;
+  return -1;
 }
