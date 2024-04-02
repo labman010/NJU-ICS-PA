@@ -17,6 +17,7 @@
 #include <cpu/decode.h>
 #include <cpu/difftest.h>
 #include <locale.h>
+#include "../monitor/sdb/sdb.h"
 
 /* The assembly code of instructions executed is only output to the screen
  * when the number of instructions executed is less than this value.
@@ -38,8 +39,19 @@ static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
 #endif
   if (g_print_step) { IFDEF(CONFIG_ITRACE, puts(_this->logbuf)); }
   IFDEF(CONFIG_DIFFTEST, difftest_step(_this->pc, dnpc));
+
+#ifdef CONFIG_WATCHPOINT
+  if (check_watchpoint()) {
+    printf("\e[1;36m");  // 设置文本颜色为青色并加粗
+    printf("Stop at:\n"); 
+    puts(_this->logbuf);
+    printf("\e[0m");  // 重置文本样式
+    nemu_state.state = NEMU_STOP;
+  }
+#endif
 }
 
+/* 让CPU执行当前PC指向的一条指令, 然后更新PC. */
 static void exec_once(Decode *s, vaddr_t pc) {
   s->pc = pc;
   s->snpc = pc;
@@ -52,7 +64,7 @@ static void exec_once(Decode *s, vaddr_t pc) {
   int i;
   uint8_t *inst = (uint8_t *)&s->isa.inst.val;
   for (i = ilen - 1; i >= 0; i --) {
-    p += snprintf(p, 4, " %02x", inst[i]);
+    p += snprintf(p, 4, " %02x", inst[i]); // si 单步调试中的一条指令的内容。
   }
   int ilen_max = MUXDEF(CONFIG_ISA_x86, 8, 4);
   int space_len = ilen_max - ilen;
@@ -62,6 +74,7 @@ static void exec_once(Decode *s, vaddr_t pc) {
   p += space_len;
 
 #ifndef CONFIG_ISA_loongarch32r
+  // s反汇编，打印 si 二进制指令对应的汇编指令。
   void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
   disassemble(p, s->logbuf + sizeof(s->logbuf) - p,
       MUXDEF(CONFIG_ISA_x86, s->snpc, s->pc), (uint8_t *)&s->isa.inst.val, ilen);

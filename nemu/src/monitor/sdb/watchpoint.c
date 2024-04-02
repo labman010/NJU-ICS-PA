@@ -1,4 +1,4 @@
-/***************************************************************************************
+  /***************************************************************************************
 * Copyright (c) 2014-2022 Zihao Yu, Nanjing University
 *
 * NEMU is licensed under Mulan PSL v2.
@@ -17,14 +17,6 @@
 
 #define NR_WP 32
 
-typedef struct watchpoint {
-  int NO;
-  struct watchpoint *next;
-
-  /* TODO: Add more members if necessary */
-
-} WP;
-
 static WP wp_pool[NR_WP] = {};
 static WP *head = NULL, *free_ = NULL;
 
@@ -40,4 +32,95 @@ void init_wp_pool() {
 }
 
 /* TODO: Implement the functionality of watchpoint */
+WP* new_wp() {
+  if (free_ == NULL) {
+    Assert(0, "Error: No free watchpoints available");
+  }
 
+  WP *new_watchpoint = free_;
+  free_ = free_->next;
+  new_watchpoint->next = head;
+  head = new_watchpoint;
+  return new_watchpoint;
+}
+
+void free_wp(WP *wp) {
+  if (wp == NULL) {
+    fprintf(stderr, "Error: Trying to free a NULL watchpoint\n");
+    return;
+  }
+  
+  WP *current = head;
+  WP *prev = NULL;
+  while (current != NULL && current != wp) {
+      prev = current;
+      current = current->next;
+  }
+
+  if (current == NULL) {
+      fprintf(stderr, "Error: Watchpoint not found in active list\n");
+      return;
+  }
+
+  if (prev == NULL) {
+      head = head->next;
+  } else {
+      prev->next = current->next;
+  }
+
+  wp->next = free_;
+  free_ = wp;
+}
+
+bool add_watchpoint(const char *args, uint32_t value) {
+  if (strlen(args) >= MAX_EXPR_LEN) {
+    printf("watchpoint string too long!\n");
+    return false;
+  }
+  WP* p = new_wp();
+  strcpy(p->expr, args);
+  p->value = value;
+  return true;
+}
+
+void delete_watchpoint(int NO) {  // 这里其实是O(NR_WP^2)复杂度,可优化
+  WP *p = head;
+  while (p != NULL && p->NO != NO) {
+    p = p->next;
+  }
+  if (p == NULL) {
+      printf("Error: Watchpoint not found in active list\n");
+      return;
+  }
+  free_wp(p);
+}
+
+bool check_watchpoint() {
+  WP *p = head;
+  bool success = true;
+  bool changed = false;
+  while (p){
+    uint32_t value = expr(p->expr, &success);
+    if (value != p->value || !success){
+      changed = true;
+      printf("nemu watchpoint %d: %s\n", p->NO, p->expr);
+      printf("\tOld value = %u\n\tNew value = %u\n", p->value, value);
+      p->value = value;
+    }
+    p = p->next;
+  }
+  return changed;
+}
+
+void watchpoint_display() {
+  WP* cur = head;
+  if (cur == NULL) {
+    printf("No watchpoint found.\n");
+    return;
+  }
+  printf("NO.\tExpr\n");
+  while (cur){
+    printf("\e[1;36m%d\e[0m\t\e[0;32m%s\e[0m\n", cur->NO, cur->expr);
+    cur = cur->next;
+  }
+}
