@@ -161,7 +161,7 @@ static int cmd_x(char *args) {
       printf("0x%08x: ", addr);
       for (int j = 0; j < 4; j++) {
         /* 
-          注意是否合理: len设置为1，我严格按照字节顺序打印，结果与cpu_exec()打印的不同，因为是大端。
+          [maybe todo]: 这里按字节顺序由低地址向高地址打印，结果与cpu_exec()打印的顺序相反
         */
         word_t value = vaddr_read(addr, 1);
         printf("%02x ", value);
@@ -174,6 +174,10 @@ static int cmd_x(char *args) {
 }
 
 static int cmd_p(char *args) {
+  if (args == NULL) {
+    printf("Wrong usage of p, missing expression\n");
+    return 0;
+  }
   bool success;
   uint32_t v = expr(args, &success);
   if (success)
@@ -185,6 +189,10 @@ static int cmd_p(char *args) {
 }
 
 static int cmd_w(char *args) {
+  if (args == NULL) {
+    printf("Wrong usage of w, missing expression\n");
+    return 0;
+  }
   bool success;
   uint32_t v = expr(args, &success);
   if (!success) {
