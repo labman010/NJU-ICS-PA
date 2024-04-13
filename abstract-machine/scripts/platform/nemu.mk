@@ -12,6 +12,8 @@ LDFLAGS   += -T $(AM_HOME)/scripts/linker.ld \
              --defsym=_pmem_start=0x80000000 --defsym=_entry_offset=0x0
 LDFLAGS   += --gc-sections -e _start
 NEMUFLAGS += -l $(shell dirname $(IMAGE).elf)/nemu-log.txt
+### pa2.2第一部分,添加批处理选项,使得通过am启动nemu时采用批处理模式直接执行加载的程序/img.
+NEMUFLAGS +=  -b
 
 CFLAGS += -DMAINARGS=\"$(mainargs)\"
 CFLAGS += -I$(AM_HOME)/am/src/platform/nemu/include
