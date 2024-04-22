@@ -35,7 +35,10 @@ void device_update();
 
 static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
 #ifdef CONFIG_ITRACE_COND
-  if (ITRACE_COND) { log_write("%s\n", _this->logbuf); }
+  if (ITRACE_COND) {
+    log_write("%s\n", _this->logbuf);
+    write_iring(_this->logbuf); // [待定]未规定指令记录时机
+  }
 #endif
   if (g_print_step) { IFDEF(CONFIG_ITRACE, puts(_this->logbuf)); }
   IFDEF(CONFIG_DIFFTEST, difftest_step(_this->pc, dnpc));
@@ -106,6 +109,9 @@ static void statistic() {
 
 void assert_fail_msg() {
   isa_reg_display();
+#ifdef CONFIG_ITRACE_COND
+  iring_display(); // [待定]未规定iring输出时机
+#endif
   statistic();
 }
 

@@ -75,20 +75,58 @@ static int decode_exec(Decode *s) {
   INSTPAT("??????? ????? ????? ??? ????? 00101 11", auipc  , U, R(rd) = s->pc + imm);
   INSTPAT("??????? ????? ????? ??? ????? 01101 11", lui    , U, R(rd) = imm);
 
+  INSTPAT("??????? ????? ????? 000 ????? 00000 11", lb     , I, R(rd) = SEXT(Mr(src1 + imm, 1), 8));
   INSTPAT("??????? ????? ????? 100 ????? 00000 11", lbu    , I, R(rd) = Mr(src1 + imm, 1));
   INSTPAT("??????? ????? ????? 010 ????? 00000 11", lw     , I, R(rd) = Mr(src1 + imm, 4));
   INSTPAT("??????? ????? ????? 001 ????? 00000 11", lh     , I, R(rd) = SEXT(Mr(src1 + imm, 2), 16));
   INSTPAT("??????? ????? ????? 101 ????? 00000 11", lhu    , I, R(rd) = Mr(src1 + imm, 2));
+  INSTPAT("??????? ????? ????? 010 ????? 00100 11", slti   , I, R(rd) = ((sword_t)src1 < (sword_t)imm));
   INSTPAT("??????? ????? ????? 011 ????? 00100 11", sltiu  , I, R(rd) = (src1 < imm));
   INSTPAT("??????? ????? ????? 100 ????? 00100 11", xori   , I, R(rd) = src1 ^ imm); // 立即数异或
+  INSTPAT("??????? ????? ????? 110 ????? 00100 11", ori    , I, R(rd) = src1 | imm);
   INSTPAT("??????? ????? ????? 111 ????? 00100 11", andi   , I, R(rd) = src1 & imm);
   INSTPAT("0100000 ????? ????? 101 ????? 00100 11", srai   , I, R(rd) = (sword_t)src1 >> (imm & 0x1f)); // 算术右移。imm有5位
   INSTPAT("0000000 ????? ????? 101 ????? 00100 11", srli   , I, R(rd) = src1 >> (imm & 0x1f)); // 逻辑右移
   INSTPAT("0000000 ????? ????? 001 ????? 00100 11", slli   , I, R(rd) = src1 << (imm & 0x1f)); // 逻辑左移
   INSTPAT("??????? ????? ????? 000 ????? 00100 11", addi   , I, R(rd) = src1 + imm); // 伪指令li的一种实现
-  INSTPAT("??????? ????? ????? 000 ????? 11001 11", jalr   , I, R(rd) = s->snpc; s->dnpc = src1 + imm); // 伪指令 ret 的具体实现
+  INSTPAT("??????? ????? ????? 000 ????? 11001 11", jalr   , I, R(rd) = s->snpc; s->dnpc = src1 + imm;
+                                                                IFDEF(CONFIG_FTRACE, 
+                                                                  if(s->isa.inst.val == 0x78067){
+                                                                    // [TODO]不知道是什么,为什么跳过
+                                                                    // 000000000000 01111 000 00000 1100111
+                                                                    // 参考某个pa的说法:
+                                                                      /*
+                                                                        jr  <-> jalr x0, 0(rs1)
+                                                                        0x00078067 | 00000000 00000111 10000000 01100111
+                                                                        t =pc+4; pc=(x[15](a5)+offset(0))&∼1; x[0]=t
+                                                                        here return address aborted due to `tail-recursive`
+                                                                      */
+                                                                  }
+                                                                  else if(s->isa.inst.val == 0x00008067) {
+                                                                    // 理解为调用返回指令
+                                                                    // [riscv标准]即 ret -> jalr x0, 0(x1)
+                                                                    // 000000000000 00001 000 00000 1100111
+                                                                    ftrace_ret_print(s->pc, s->dnpc);
+                                                                  }
+                                                                  else if(rd == 1) {
+                                                                    // (rd == 1 || rd == 5) && (src1 != 1 && src1 != 5)
+                                                                    // [riscv标准] 函数调用指令
+                                                                    ftrace_call_print(s->pc, s->dnpc, false);
+                                                                  }
+                                                                  else if(rd == 0 && imm == 0) {
+                                                                    // 据说是尾调用的特征
+                                                                    // [riscv标准]即 jr -> jalr x0, 0(rs1)
+                                                                    // 区别于ret,这里rs1可以为其他的寄存器,是一种间接跳转。
+                                                                    ftrace_call_print(s->pc, s->dnpc, true);
+                                                                  }
+                                                                ));
 
-  INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal    , J, R(rd) = s->snpc; s->dnpc = s->pc + imm);
+  INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal    , J, R(rd) = s->snpc; s->dnpc = s->pc + imm; 
+                                                                IFDEF(CONFIG_FTRACE, 
+                                                                  if(rd == 1) { // [riscv标准]目标寄存器为x1或x5时, 判定在做函数调用
+                                                                    ftrace_call_print(s->pc, s->dnpc, false);
+                                                                  }
+                                                                ));
 
   INSTPAT("??????? ????? ????? 000 ????? 01000 11", sb     , S, Mw(src1 + imm, 1, src2));
   INSTPAT("??????? ????? ????? 010 ????? 01000 11", sw     , S, Mw(src1 + imm, 4, src2));

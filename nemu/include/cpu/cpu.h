@@ -23,6 +23,11 @@ void cpu_exec(uint64_t n);
 void set_nemu_state(int state, vaddr_t pc, int halt_ret);
 void invalid_inst(vaddr_t thispc);
 
+#ifdef CONFIG_FTRACE
+void ftrace_call_print(uint32_t inst_pc, uint32_t inst_des, bool is_tail_call);
+void ftrace_ret_print(uint32_t inst_pc, uint32_t inst_des);
+#endif
+
 #define NEMUTRAP(thispc, code) set_nemu_state(NEMU_END, thispc, code)
 #define INV(thispc) invalid_inst(thispc)
 
