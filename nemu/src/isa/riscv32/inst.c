@@ -21,6 +21,35 @@
 #define R(i) gpr(i)
 #define Mr vaddr_read
 #define Mw vaddr_write
+#define CSR *csr_register
+
+// Kconfig TRACE, 记录所有异常处理的踪迹
+#ifdef CONFIG_ETRACE
+uint32_t etrace_no = 0;
+#define ETRACE_PRINT printf("\33[1;31metrace %d:\n\tepc:0x%x  mstatus:%x  mcause:%d  mtvec:0x%x\n\33[0m",\
+           etrace_no++, cpu.csr.mepc, cpu.csr.mstatus, cpu.csr.mcause, cpu.csr.mtvec);
+#endif
+
+
+// 按照手册 mcause=0xb 表示的是environment call from M-mode
+// 由于我们全程都在M模式下跑，因此ecall对应的mcause就是0xb
+#define ECALL(dnpc) { \
+  dnpc = (isa_raise_intr(0xb, s->pc)); \
+  IFDEF(CONFIG_ETRACE, ETRACE_PRINT); \
+  }
+
+// clear MIE(4th bit) flag
+// set MPIE to MIE
+// set MPIE to 1
+// clear MPP flag to consistent with spike
+#define MRET { \
+  s->dnpc = cpu.csr.mepc; \
+  cpu.csr.mstatus &= ~(1<<3); \
+  cpu.csr.mstatus |= ((cpu.csr.mstatus&(1<<7))>>4); \
+  cpu.csr.mstatus |= (1<<7); \
+  cpu.csr.mstatus &= ~((1<<11)+(1<<12)); \
+}
+
 
 enum {
   TYPE_I, TYPE_U, TYPE_S, TYPE_J, TYPE_R, TYPE_B,
@@ -74,6 +103,12 @@ static int decode_exec(Decode *s) {
   */
   INSTPAT("??????? ????? ????? ??? ????? 00101 11", auipc  , U, R(rd) = s->pc + imm);
   INSTPAT("??????? ????? ????? ??? ????? 01101 11", lui    , U, R(rd) = imm);
+
+  INSTPAT("0011000 00010 00000 000 00000 11100 11", mret   , J, MRET;);
+
+  INSTPAT("0000000 00000 00000 000 00000 11100 11", ecall  , I, ECALL(s->dnpc)); 
+  INSTPAT("??????? ????? ????? 001 ????? 11100 11", csrrw  , I, R(rd) = CSR(imm), CSR(imm) = src1);  // 在汇编代码中显示为 csrw
+  INSTPAT("??????? ????? ????? 010 ????? 11100 11", csrrs  , I, R(rd) = CSR(imm), CSR(imm) |= src1); // 在汇编代码中显示为 csrr
 
   INSTPAT("??????? ????? ????? 000 ????? 00000 11", lb     , I, R(rd) = SEXT(Mr(src1 + imm, 1), 8));
   INSTPAT("??????? ????? ????? 100 ????? 00000 11", lbu    , I, R(rd) = Mr(src1 + imm, 1));

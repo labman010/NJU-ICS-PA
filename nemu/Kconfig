@@ -142,6 +142,10 @@ config TRACE
   bool "Enable tracer"
   default y
 
+config ETRACE
+  bool "Enable EXCEPTION trace"
+  default n
+
 config TRACE_START
   depends on TRACE
   int "When tracing is enabled (unit: number of instructions)"

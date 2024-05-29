@@ -19,8 +19,17 @@
 #include <common.h>
 
 typedef struct {
+  word_t mstatus;
+  word_t mtvec;
+  word_t mcause;
+  vaddr_t mepc;
+} riscv32_CSR_state;
+
+
+typedef struct {
   word_t gpr[MUXDEF(CONFIG_RVE, 16, 32)];
   vaddr_t pc;
+  riscv32_CSR_state csr;
 } MUXDEF(CONFIG_RV64, riscv64_CPU_state, riscv32_CPU_state);
 
 // decode
