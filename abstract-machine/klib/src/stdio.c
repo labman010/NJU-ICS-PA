@@ -1,3 +1,5 @@
+// 未全面测试,任何一处都有可能有bug。
+
 #include <am.h>
 #include <klib.h>
 #include <klib-macros.h>
@@ -5,8 +7,10 @@
 
 #if !defined(__ISA_NATIVE__) || defined(__NATIVE_USE_KLIB__)
 
+#define MAX_PRINTF_BUF 2048
+
 int printf(const char *fmt, ...) {
-  char buf[1024];
+  char buf[MAX_PRINTF_BUF];
   va_list args;
   int ret;
 
@@ -66,7 +70,7 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
           break;
         }
         case 'u': {
-          uint32_t u = va_arg(ap, uint32_t);
+          unsigned int u = va_arg(ap, unsigned int);
           char *s = buf;
           // 将无符号整数转换为字符串
           do {
@@ -84,7 +88,7 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
           }
           break;
         }
-        case 'U': { // 临时用大U表示unsigned long long, printf接受输入时必须强制转换uint64_t
+        case 'U': { //[原本为%lu]临时用大U表示unsigned long long, printf接受输入时必须强制转换uint64_t
           uint64_t llu = va_arg(ap, uint64_t);
           char *s = buf;
           // 将无符号长长整数转换为字符串
@@ -104,27 +108,48 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
           break;
         }
         case 'x': { // 正确性不保证.无法直接输入uint64_t类型
-            uint32_t d = va_arg(ap, uint32_t);
-            char *s = buf;
-            // 将整数转换为16进制字符串
-            do {
-              int digit = d % 16;
-              *(s++) = digit < 10 ? '0' + digit : 'a' + digit - 10;
-              d /= 16;
-            } while (d);
-            int zeros = width - (s - buf);
-            while (zeros-- > 0) {
-              *(p++) = '0';
-            }
-            // 倒序写入到输出字符串
-            while (s > buf) {
-              *(p++) = *(--s);
-            }
-            break;
+          uint32_t d = va_arg(ap, uint32_t);
+          char *s = buf;
+          // 将整数转换为16进制字符串
+          do {
+            int digit = d % 16;
+            *(s++) = digit < 10 ? '0' + digit : 'a' + digit - 10;
+            d /= 16;
+          } while (d);
+          int zeros = width - (s - buf);
+          while (zeros-- > 0) {
+            *(p++) = '0';
+          }
+          // 倒序写入到输出字符串
+          while (s > buf) {
+            *(p++) = *(--s);
+          }
+          break;
         }
         case 'c': {
           char c = (char)va_arg(ap, int);
           *(p++) = c;
+          break;
+        }
+        case 'p': { // 用十六进制打印指针变量指向的地址。
+          void *ptr = va_arg(ap, void *);
+          uintptr_t value = (uintptr_t)ptr;
+          *(p++) = '0';
+          *(p++) = 'x';
+          char *s = buf;
+          // 后续实现完全等同%x
+          do {
+            int digit = value % 16;
+            *(s++) = digit < 10 ? '0' + digit : 'a' + digit - 10;
+            value /= 16;
+          } while (value);
+          int zeros = width - (s - buf);
+          while (zeros-- > 0) {
+            *(p++) = '0';
+          }
+          while (s > buf) {
+            *(p++) = *(--s);
+          }
           break;
         }
         default:
